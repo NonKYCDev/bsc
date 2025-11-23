@@ -71,6 +71,7 @@ var (
 			utils.OverrideLorentz,
 			utils.OverrideMaxwell,
 			utils.OverrideFermi,
+			utils.OverrideOsaka,
 			utils.OverrideVerkle,
 			utils.MultiDataBaseFlag,
 		}, utils.DatabaseFlags),
@@ -344,6 +345,10 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverrideFermi.Name)
 		overrides.OverrideFermi = &v
 	}
+	if ctx.IsSet(utils.OverrideOsaka.Name) {
+		v := ctx.Uint64(utils.OverrideOsaka.Name)
+		overrides.OverrideOsaka = &v
+	}
 	if ctx.IsSet(utils.OverrideVerkle.Name) {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		overrides.OverrideVerkle = &v
@@ -355,11 +360,10 @@ func initGenesis(ctx *cli.Context) error {
 	name := "chaindata"
 	// if the trie data dir has been set, new trie db with a new state database
 	if ctx.IsSet(utils.MultiDataBaseFlag.Name) {
-		statediskdb, dbErr := stack.OpenDatabaseWithFreezer(name+"/state", 0, 0, "", "", false)
-		if dbErr != nil {
-			utils.Fatalf("Failed to open separate trie database: %v", dbErr)
+		err = stack.SetMultiDBs(chaindb, name, 0, 0, false)
+		if err != nil {
+			utils.Fatalf("Failed to init multi-database: %v", err)
 		}
-		chaindb.SetStateStore(statediskdb)
 		log.Warn("Multi-database is an experimental feature")
 	}
 
@@ -747,8 +751,7 @@ func dumpGenesis(ctx *cli.Context) error {
 
 	// set the separate state & block database
 	if stack.CheckIfMultiDataBase() && err == nil {
-		stateDiskDb := utils.MakeStateDataBase(ctx, stack, true)
-		db.SetStateStore(stateDiskDb)
+		stack.SetMultiDBs(db, "chaindata", 0, 0, true)
 	}
 
 	genesis, err = core.ReadGenesis(db)
